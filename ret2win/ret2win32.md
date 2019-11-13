@@ -60,6 +60,7 @@ You there madam, may I have your input please? And don't worry about null bytes,
 
 > aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaamaaanaaaoaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa
 
+Program received signal SIGSEGV, Segmentation fault.
 ...
 
 EIP  0x6161616c ('laaa')
