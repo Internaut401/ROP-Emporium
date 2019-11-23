@@ -60,8 +60,6 @@ RBP  0x6161616a61616169 ('iaaajaaa')
 
 pwndbg> cyclic -l 'iaaa'
 32
-
-...
 ```
 
 32 byte to RBP ( +8 to RIP = 40 ). Final exploit:
