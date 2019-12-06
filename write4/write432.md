@@ -11,6 +11,34 @@ As always running checksec we have:
 RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH	Symbols		FORTIFY	Fortified	Fortifiable  FILE
 Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RUNPATH   81 Symbols     No	0		3	write432
 ```
+
+Before build our ropchain let's see now many bytes there are until eip:
+```gdb
+[marco@marco-pc Downloads]$ gdb-pwndbg write432
+Reading symbols from write432...
+(No debugging symbols found in write432)
+pwndbg: loaded 181 commands. Type pwndbg [filter] for a list.
+pwndbg: created $rebase, $ida gdb functions (can be used with print/break)
+pwndbg> cyclic 50
+aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaama
+pwndbg> r
+Starting program: /home/marco/Downloads/write432 
+write4 by ROP Emporium
+32bits
+
+Go ahead and give me the string already!
+> aaaabaaacaaadaaaeaaafaaagaaahaaaiaaajaaakaaalaaama
+
+Program received signal SIGSEGV, Segmentation fault.
+0x6161616c in ?? ()
+...
+ EIP  0x6161616c ('laaa')
+...
+Program received signal SIGSEGV (fault address 0x6161616c)
+pwndbg> cyclic -l 'laaa'
+44
+```
+
 With readelf we can explore memory sections marked as readable and their dimensions:
 ```shell
 [marco@marco-pc Downloads]$ readelf -S write432
