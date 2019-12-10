@@ -1,12 +1,12 @@
 The goal of the challenge is to master the writing in memory with ropchain. 
-In this case we want to write the string '*/bin/sh*' somewhere in memory. Then perform a system with this string as argument.
+This time we want to write the string '*/bin/sh*' somewhere in memory. Then perform a system with this string as argument.
 To do that we some ingredients:
 - writeable memory area
 - gadgets to write in memory
 - gadgets to execute system()
 
 As always running checksec we have:
-```
+```shell
 [marco@marco-pc Downloads]$ checksec --file="write4"
 RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH	Symbols		FORTIFY	Fortified	Fortifiable  FILE
 Partial RELRO   No canary found   NX enabled    No PIE          No RPATH   No RUNPATH   79 Symbols     No	0		3	write4
@@ -81,4 +81,69 @@ Key to Flags:
   L (link order), O (extra OS processing required), G (group), T (TLS),
   C (compressed), x (unknown), o (OS specific), E (exclude),
   l (large), p (processor specific)
+```
+The bss section seems to be perfect! Now we need some gadgets to write in memory. 
+Something like mov DWORD PTR [reg], reg; ret. In this case the program give us usefulGadget:
+```gdb
+[marco@marco-pc Downloads]$ gdb-pwndbg -q write4
+Reading symbols from write4...
+(No debugging symbols found in write4)
+pwndbg: loaded 181 commands. Type pwndbg [filter] for a list.
+pwndbg: created $rebase, $ida gdb functions (can be used with print/break)
+pwndbg> disassemble usefulGadgets 
+Dump of assembler code for function usefulGadgets:
+   0x0000000000400820 <+0>:	mov    QWORD PTR [r14],r15
+   0x0000000000400823 <+3>:	ret    
+   0x0000000000400824 <+4>:	nop    WORD PTR cs:[rax+rax*1+0x0]
+   0x000000000040082e <+14>:	xchg   ax,ax
+End of assembler dump.
+```
+
+SOME gadgets:
+```shell
+[marco@marco-pc Downloads]$ ROPgadget --binary="write4" > gadgets
+[marco@marco-pc Downloads]$ cat gadgets | grep mov
+0x000000000040081c : add byte ptr [rax], al ; add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
+0x000000000040081e : add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
+0x0000000000400739 : int1 ; push rbp ; mov rbp, rsp ; call rax
+0x000000000040069d : je 0x4006b8 ; pop rbp ; mov edi, 0x601060 ; jmp rax
+0x00000000004006eb : je 0x400700 ; pop rbp ; mov edi, 0x601060 ; jmp rax
+0x0000000000400738 : je 0x400731 ; push rbp ; mov rbp, rsp ; call rax
+0x0000000000400713 : mov byte ptr [rip + 0x20096e], 1 ; ret
+0x0000000000400821 : mov dword ptr [rsi], edi ; ret
+0x00000000004007ae : mov eax, 0 ; pop rbp ; ret
+0x00000000004005b1 : mov eax, dword ptr [rax] ; add byte ptr [rax], al ; add rsp, 8 ; ret
+0x000000000040073c : mov ebp, esp ; call rax
+0x00000000004006a0 : mov edi, 0x601060 ; jmp rax
+0x0000000000400820 : mov qword ptr [r14], r15 ; ret
+0x000000000040073b : mov rbp, rsp ; call rax
+0x0000000000400712 : pop rbp ; mov byte ptr [rip + 0x20096e], 1 ; ret
+0x000000000040069f : pop rbp ; mov edi, 0x601060 ; jmp rax
+0x000000000040073a : push rbp ; mov rbp, rsp ; call rax
+0x0000000000400737 : sal byte ptr [rcx + rsi*8 + 0x55], 0x48 ; mov ebp, esp ; call rax
+0x000000000040081a : test byte ptr [rax], al ; add byte ptr [rax], al ; add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
+0x0000000000400736 : test eax, eax ; je 0x400733 ; push rbp ; mov rbp, rsp ; call rax
+0x0000000000400735 : test rax, rax ; je 0x400734 ; push rbp ; mov rbp, rsp ; call rax
+[marco@marco-pc Downloads]$ cat gadgets | grep pop
+0x00000000004006ac : add byte ptr [rax], al ; add byte ptr [rax], al ; pop rbp ; ret
+0x00000000004006ae : add byte ptr [rax], al ; pop rbp ; ret
+0x000000000040069d : je 0x4006b8 ; pop rbp ; mov edi, 0x601060 ; jmp rax
+0x00000000004006eb : je 0x400700 ; pop rbp ; mov edi, 0x601060 ; jmp rax
+0x00000000004007ae : mov eax, 0 ; pop rbp ; ret
+0x0000000000400815 : nop ; pop rbp ; ret
+0x00000000004006a8 : nop dword ptr [rax + rax] ; pop rbp ; ret
+0x00000000004006f5 : nop dword ptr [rax] ; pop rbp ; ret
+0x000000000040088c : pop r12 ; pop r13 ; pop r14 ; pop r15 ; ret
+0x000000000040088e : pop r13 ; pop r14 ; pop r15 ; ret
+0x0000000000400890 : pop r14 ; pop r15 ; ret
+0x0000000000400892 : pop r15 ; ret
+0x0000000000400712 : pop rbp ; mov byte ptr [rip + 0x20096e], 1 ; ret
+0x000000000040069f : pop rbp ; mov edi, 0x601060 ; jmp rax
+0x000000000040088b : pop rbp ; pop r12 ; pop r13 ; pop r14 ; pop r15 ; ret
+0x000000000040088f : pop rbp ; pop r14 ; pop r15 ; ret
+0x00000000004006b0 : pop rbp ; ret
+0x0000000000400893 : pop rdi ; ret
+0x0000000000400891 : pop rsi ; pop r15 ; ret
+0x000000000040088d : pop rsp ; pop r13 ; pop r14 ; pop r15 ; ret
+0x00000000004006aa : test byte ptr [rax], al ; add byte ptr [rax], al ; add byte ptr [rax], al ; pop rbp ; ret
 ```
