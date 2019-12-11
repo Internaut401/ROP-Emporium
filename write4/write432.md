@@ -130,7 +130,7 @@ Another gadget we need is a pop instruction for load values into registers (in t
 0x080485f3 : popal ; cld ; ret
 ```
 '*pop edi; pop ebp*' fit perfectly for our purpose.
-To execute the write i wrote a dedicated function, which basically pad the string with null bytes until the length is a multiple of 16.
+To execute the write i wrote a dedicated function, which basically pad the string with null bytes until the length is a multiple of 4.
 Then cut the string in group by 4. And finally it writes 4 bytes at a time in memory adding 4 to the address for each write:
 ```python
 def write_string_bss(mov_gadget, pop_gadget, bss_address, string):
